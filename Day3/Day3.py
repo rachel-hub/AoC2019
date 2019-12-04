@@ -4,9 +4,7 @@
 import numpy as np
 
 # Inputs
-
-InputData = np.loadtxt("aoc2019_day3_input.txt",
-                       dtype=str)
+InputData = np.loadtxt("aoc2019_day3_input.txt", dtype=str)
 
 TestData = np.array(["R8,U5,L5,D3",
                      "U7,R6,D4,L4"])
@@ -14,6 +12,8 @@ TestData = np.array(["R8,U5,L5,D3",
 # Functions
 
 
+# Function to generate all the co-ordinates a wire passes through
+# Append as tuples because lists of lists aren't suitable for set operations later
 def generate_wire_coordinates(wire):
     coordinates = []
     x_coordinate = 0
@@ -47,30 +47,31 @@ def generate_wire_coordinates(wire):
 
 # Part 1
 
+# Set-up our two wires from input data
 Wire1 = InputData[0].split(",")
 Wire2 = InputData[1].split(",")
-
 # Wire1 = TestData[0].split(",")
 # Wire2 = TestData[1].split(",")
 
+# Generate all wire co-ordinates
 Wire1Coordinates = generate_wire_coordinates(Wire1)
 Wire2Coordinates = generate_wire_coordinates(Wire2)
 
 # Calculate wire intersections
-
 WireOverlaps = list(set(Wire1Coordinates) & set(Wire2Coordinates))
 
+# Calculate Manhattan distance from origin of the intersections
 WireDistances = [abs(coordinate_pair[0]) + abs(coordinate_pair[1]) for coordinate_pair in WireOverlaps]
 
 # Identify which is the shortest Manhattan distance intersection
-result = min(WireDistances)
-# result = WireOverlaps[WireDistances.index(min(WireDistances))]
+distanceToClosestIntersection = min(WireDistances)
 
 # Part 2
 
 # Need to calculate minimum signal delay
-
-# Need to add 2 because 1 needs addingto each index due to zero based indexing
+# The index plus 1 is the signal delay at a co-ordinate
+# Adding 2 is the same as adding one twice
 SignalDelay = [Wire1Coordinates.index(overlap) + Wire2Coordinates.index(overlap) + 2 for overlap in WireOverlaps]
 
+# Calculate the minimum signla delay
 minDelay = min(SignalDelay)
