@@ -42,6 +42,20 @@ AllPlanets = AllPlanets[["Centre", "Orbiter", "InOrbit"]]
 AllPlanetsPivot = AllPlanets.pivot(index="Centre", columns="Orbiter", values="InOrbit")
 AdjacencyMatrix = np.array(AllPlanetsPivot)
 
-# Now need to exponentiate to work out paths of different lengths (i.e. orbits of different sub-levels)
-# Need to work out how to avoid double counting (is this an issue?)
-# Need to work out stopping criteria
+# Part 1
+
+thisMatrix = AdjacencyMatrix.copy()
+thisMatrixSum = thisMatrix.sum()
+totalOrbits = thisMatrixSum.copy()
+i = 2
+
+while thisMatrixSum > 0:
+    if (i//50) == (i/50):
+        print("Currently on exponent " + str(i))
+    thisMatrix = np.matmul(thisMatrix, AdjacencyMatrix)
+    thisMatrixSum = thisMatrix.sum()
+    totalOrbits += thisMatrixSum
+    i += 1
+
+totalOrbits
+
