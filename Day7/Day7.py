@@ -43,7 +43,7 @@ InputData = np.loadtxt("aoc2019_day7_input.txt",
 # It might be sensible to parametrise by the number of parameters to help future proof
 
 
-def intcode(input_data,phase_value,input_value):
+def intcode(input_data,phase_value,input_value,output_parameters=[]):
     this_input = input_data.copy()
     return_value = np.nan
     phase_use_counter = 0
@@ -119,6 +119,7 @@ def intcode(input_data,phase_value,input_value):
         elif current_op_code == 4:
             print(parameter1)
             return_value = parameter1.copy()
+            output_parameters.append(return_value)
             current_index += 2
 
         elif current_op_code == 5:
@@ -162,6 +163,44 @@ def amplifiers(input_data,phase_value_a,phase_value_b,phase_value_c,phase_value_
     return amplifier_e_value
 
 
+def adjusted_amplifiers(input_data,phase_value_a,phase_value_b,phase_value_c,phase_value_d,phase_value_e,input_value):
+    amplifier_a_parameters = []
+    amplifier_b_parameters = []
+    amplifier_c_parameters = []
+    amplifier_d_parameters = []
+    amplifier_e_parameters = [input_value]
+
+    amplifier_a_output = np.nan
+    amplifier_b_output = np.nan
+    amplifier_c_output = np.nan
+    amplifier_d_output = np.nan
+    amplifier_e_output = np.nan
+
+    while np.isnan(amplifier_a_output) or np.isnan(amplifier_b_output) or np.isnan(amplifier_c_output) or \
+        np.isnan(amplifier_d_output) or np.isnan(amplifier_e_output):
+        if len(amplifier_a_parameters) > 0:
+            amplifier_a_value = amplifier_a_parameters[0]
+            amplifier_a_parameters = amplifier_a_parameters[1:]
+            amplifier_b_output = intcode(input_data, phase_value_b, amplifier_a_value, amplifier_b_parameters)
+        if len(amplifier_b_parameters) > 0:
+            amplifier_b_value = amplifier_b_parameters[0]
+            amplifier_b_parameters = amplifier_b_parameters[1:]
+            amplifier_c_output = intcode(input_data, phase_value_c, amplifier_b_value, amplifier_c_parameters)
+        if len(amplifier_c_parameters) > 0:
+            amplifier_c_value = amplifier_c_parameters[0]
+            amplifier_c_parameters = amplifier_c_parameters[1:]
+            amplifier_d_output = intcode(input_data, phase_value_d, amplifier_c_value, amplifier_d_parameters)
+        if len(amplifier_d_parameters) > 0:
+            amplifier_d_value = amplifier_d_parameters[0]
+            amplifier_d_parameters = amplifier_d_parameters[1:]
+            amplifier_e_output = intcode(input_data, phase_value_e, amplifier_d_value, amplifier_e_parameters)
+        if len(amplifier_e_parameters) > 0:
+            amplifier_e_value = amplifier_e_parameters[0]
+            amplifier_e_parameters = amplifier_e_parameters[1:]
+            amplifier_a_output = intcode(input_data, phase_value_a, amplifier_e_value, amplifier_a_parameters)
+    return amplifier_e_value
+
+
 # Part 1
 # Work out which permutation of phases gives the largest amplifier signal
 
@@ -181,3 +220,9 @@ for perm in perms:
 
 MaxOutputSignal
 
+# Part 2
+
+# Need to handle passing parameters between intcode and others
+# Probably want to return values after step 4 with some other parameters to help it resume
+# Likely all those set at the start - put them in as inputs with default values instead
+# Need to make sure the final return is distinguishable to help with while loop in amplifier handling code
