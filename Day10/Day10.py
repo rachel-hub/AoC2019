@@ -5,10 +5,15 @@
 import numpy as np
 import pandas as pd
 
+pd.set_option('display.max_columns', 10)
+
 # Inputs
 
 with open('aoc2019_day10_input.txt', 'r') as f:
     x = f.read().splitlines()
+
+# with open('aoc2019_day10_input_big_example.txt', 'r') as f:
+#     x = f.read().splitlines()
 
 InputData = []
 for line in x:
@@ -37,15 +42,6 @@ asteroids = np.where(ThisInput == '#')
 AsteroidCoordinates = []
 for k in range(len(asteroids[0])):
     AsteroidCoordinates.append(np.array([asteroids[1][k], asteroids[0][k]]))
-
-# AsteroidCoordinates = np.array(AsteroidCoordinates)
-
-# StartAsteroid = AsteroidCoordinates[0]
-# AsteroidDirections = AsteroidCoordinates - StartAsteroid
-# SquareAsteroidDirections = np.pad(AsteroidDirections, ((0,0),(0,8)), 'constant', constant_values=(0))
-# MyQuadrant4Directions = [x for x in AsteroidDirections if (x[0] >= 0) and (x[1] >= 0)]
-
-# InterestingAsteroidDirections = AsteroidDirections[1:]
 
 
 def get_number_of_visible_asteroids(asteroid_directions):
@@ -106,51 +102,108 @@ for AsteroidCoordinate in AsteroidCoordinates:
 
 # Part 2
 
-# Asteroid station on [26,28]
-
+# Create 2D vectors to the asteroid station
 VectorsToAsteroidStation = AsteroidCoordinates - np.array(BestLocation)
+# Use dot product to get distances between the asteroid station and all asterois (including the one it is on)
 DistancesToAsteroids = [np.sqrt(x.dot(x)) for x in VectorsToAsteroidStation]
 
-UnitVector = np.array([1, 0])
+# Define a unit vector that points straight up
+# This is where the lazer should start
+UnitVector = np.array([0, -1])
+
+# Calculate cross products and dot products with our unit vector
+# We can use these to get cosines and sines relative to straight up which we can calculate angles from
 CrossProducts = [np.cross(x, UnitVector) for x in VectorsToAsteroidStation]
 DotProducts = [np.dot(x, UnitVector) for x in VectorsToAsteroidStation]
 
+# Create lists of sine and cosine angles to the unit vector
+# Handle the exception of the monitoring station which is at zero distance by infilling zero
+# This choice doesn't really matter - we will exclude it based upon distance later
 SineAngles = []
 CosineAngles = []
 for k in range(len(DistancesToAsteroids)):
-    if DistancesToAsteroids != 0:
+    if DistancesToAsteroids[k] != 0:
         SineAngles += [CrossProducts[k]/DistancesToAsteroids[k]]
         CosineAngles += [DotProducts[k]/DistancesToAsteroids[k]]
     else:
         SineAngles += [0]
         CosineAngles += [0]
 
+# Separate out x and y co-ordinates
+# Then they can be one column each in our data frame
 AsteroidXCoordinates = [x[0] for x in AsteroidCoordinates]
 AsteroidYCoordinates = [x[1] for x in AsteroidCoordinates]
 
+# Create a data frame of the asteroids and the information relative to the monitoring station
 AsteroidZappingInfo = pd.DataFrame({"x_coord": AsteroidXCoordinates,
                                     "y_coord": AsteroidYCoordinates,
                                     "distance": DistancesToAsteroids,
                                     "sine": SineAngles,
                                     "cosine": CosineAngles})
 
+# Calculate arcsine and arccosine to help recover angle between asteroid and our unit vector
 AsteroidZappingInfo["arcsine"] = np.arcsin(AsteroidZappingInfo["sine"])
-AsteroidZappingInfo["arccosine"] = np.arcsin(AsteroidZappingInfo["cosine"])
+AsteroidZappingInfo["arccosine"] = np.arccos(AsteroidZappingInfo["cosine"])
 
+# Four cases to recover angles for each of the four quadrants
 AsteroidZappingInfo["angle"] = np.where((AsteroidZappingInfo["sine"] > 0) & (AsteroidZappingInfo["cosine"] > 0),
                                         AsteroidZappingInfo["arcsine"], np.nan)
 AsteroidZappingInfo["angle"] = np.where((AsteroidZappingInfo["sine"] > 0) & (AsteroidZappingInfo["cosine"] <= 0),
                                         AsteroidZappingInfo["arccosine"], AsteroidZappingInfo["angle"])
 AsteroidZappingInfo["angle"] = np.where((AsteroidZappingInfo["sine"] <= 0) & (AsteroidZappingInfo["cosine"] <= 0),
-                                        AsteroidZappingInfo["arccosine"], AsteroidZappingInfo["angle"])
+                                        np.pi - AsteroidZappingInfo["arcsine"], AsteroidZappingInfo["angle"])
 AsteroidZappingInfo["angle"] = np.where((AsteroidZappingInfo["sine"] <= 0) & (AsteroidZappingInfo["cosine"] > 0),
-                                        AsteroidZappingInfo["arccosine"], AsteroidZappingInfo["angle"])
+                                        2*np.pi - AsteroidZappingInfo["arccosine"], AsteroidZappingInfo["angle"])
 
-# Need to work out what the cases for getting angles should be here so they are all in the interval [0,2*pi)
-# Need to ensure this is set-up with the right unit vector so zero is in the right place
-# Need to handle the value that is the monitoring station
-# Then order by angle then distance
-# Work out what the minimum difference between angles is
-# Work through looking for the next one that is least as big a difference than that is (or more than half distance)
-# Remove values from data frame as we loop
-# Put into a for loop so 200th thing can be returned
+# Subtract angles from 2pi to get clockwise rotation
+AsteroidZappingInfo["angle"] = 2*np.pi - AsteroidZappingInfo["angle"]
+
+# Round angles to 12dp to eliminate floating point errors - need to be able to test angle equality
+AsteroidZappingInfo["angle"] = np.round(AsteroidZappingInfo["angle"], 12)
+
+# Check all angles in range [0, 2pi)
+AsteroidZappingInfo.angle.min() >= 0
+AsteroidZappingInfo.angle.max() < 2*np.pi
+
+# Work out where our monitoring station is
+MonitoringStationIndex = AsteroidZappingInfo[AsteroidZappingInfo["distance"] == 0].index[0]
+# len(AsteroidZappingInfo)
+
+# Remove our monitoring station from our list of asteroids to be zapped
+AsteroidZappingInfo.drop(index=MonitoringStationIndex, inplace=True)
+# len(AsteroidZappingInfo)
+
+# Work through angles, zapping closes asteroid an moving to the next closest angle
+# Start at angle zero (straight up)
+ReferenceAngle = 0
+
+for k in range(200):
+    print("This is asteroid " + str(k) + " being zapped.")
+    # The asteroid that's zapped is the one closest to but beyond our reference angle
+    ZappingAngle = AsteroidZappingInfo[AsteroidZappingInfo["angle"] >= ReferenceAngle].angle.min()
+    print(ZappingAngle)
+    # If there are multiple asteroids at that angle, zap the one at the closest distance
+    DistanceToClosestAsteroid = AsteroidZappingInfo[AsteroidZappingInfo["angle"] == ReferenceAngle].distance.min()
+    print(DistanceToClosestAsteroid)
+    # Get the data frame index for the asteroid to be zapped so we can remove it from our asteroid data
+    ZappingIndex = AsteroidZappingInfo[(AsteroidZappingInfo["angle"] == ZappingAngle) &
+                                       (AsteroidZappingInfo["distance"] == DistanceToClosestAsteroid)].index[0]
+    # Store information about what is soon to be our most recently zapped asteroid
+    LastAsteroidZapped = AsteroidZappingInfo.loc[ZappingIndex,]
+    print("Asteroid zapped is " + str(LastAsteroidZapped["x_coord"]) + ", " + str(LastAsteroidZapped["y_coord"]))
+    # Zap the asteroid by removing it from our asteroid data
+    AsteroidZappingInfo.drop(index=ZappingIndex, inplace=True)
+    # Update the reference angle so the lazer rotates
+    ReferenceAngle = AsteroidZappingInfo[AsteroidZappingInfo["angle"] > ReferenceAngle].angle.min()
+    # If we go past the largest angle, reset the reference angle to zero so another rotation occurs
+    if np.isnan(ReferenceAngle):
+        ReferenceAngle = 0
+
+# Calculate the required output
+LastXCoord = LastAsteroidZapped["x_coord"]
+LastYCoord = LastAsteroidZapped["y_coord"]
+
+OutputPart2 = 100*LastXCoord + LastYCoord
+
+OutputPart2
+# This is 1309
